@@ -221,7 +221,7 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar))
 # ========= ZONA HORARIA PERÚ =========
 zona = pytz.timezone("America/Lima")
 
-app.job_queue.run_daily(
+#app.job_queue.run_daily(
     recordatorio,
     time(hour=22, minute=0, tzinfo=zona)
 )
