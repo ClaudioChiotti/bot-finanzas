@@ -222,9 +222,9 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar))
 zona = pytz.timezone("America/Lima")
 
 #app.job_queue.run_daily(
-    recordatorio,
-    time(hour=22, minute=0, tzinfo=zona)
-)
+#    recordatorio,
+#    time(hour=22, minute=0, tzinfo=zona)
+#)
 
 print("Bot corriendo...")
 app.run_polling()
