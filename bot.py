@@ -1,3 +1,6 @@
+import os
+import json
+import pytz
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -6,15 +9,26 @@ from telegram.ext import (
     filters,
     ContextTypes
 )
-
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, time
 
 # ========= CONFIG =========
-TOKEN = "8266580668:AAHUpQfqJKeT6tpg0bvzMIe_3u0_PSu_9yY"
-CHAT_ID = 1500104390
+TOKEN = os.getenv("TOKEN")
+CHAT_ID = int(os.getenv("CHAT_ID"))
 NOMBRE_SHEET = "Financial_Tracking_System"
+
+# ========= VALIDACIÓN =========
+if not TOKEN:
+    raise ValueError("Falta TOKEN en variables de entorno")
+
+if not CHAT_ID:
+    raise ValueError("Falta CHAT_ID en variables de entorno")
+
+creds_json = os.getenv("GOOGLE_CREDS")
+
+if not creds_json:
+    raise ValueError("Falta GOOGLE_CREDS en variables de entorno")
 
 # ========= GOOGLE SHEETS =========
 scope = [
@@ -22,8 +36,10 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_name(
-    "credenciales.json",
+creds_dict = json.loads(creds_json)
+
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    creds_dict,
     scope
 )
 
@@ -62,7 +78,6 @@ def obtener_resumen():
 
     return texto
 
-
 # ========= MENÚ =========
 menu = [
     ["Registrar Gasto"],
@@ -90,7 +105,7 @@ async def recordatorio(context: ContextTypes.DEFAULT_TYPE):
 # ========= HANDLER =========
 async def manejar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    # 🔒 BLOQUEO DE SEGURIDAD
+    # 🔒 SOLO TU CHAT
     if update.message.chat_id != CHAT_ID:
         return
 
@@ -129,7 +144,7 @@ async def manejar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Escribe el nuevo tipo de pago:")
         return
 
-    # FLUJO REGISTRO
+    # ========= FLUJO REGISTRO =========
     estado = context.user_data.get("estado")
 
     if estado == "tipo_pago":
@@ -167,14 +182,14 @@ async def manejar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
 
         await update.message.reply_text(
-            f"✔ Registrado: {monto}",
+            f"✔ Registrado: S/{monto}",
             reply_markup=markup_menu
         )
 
         context.user_data.clear()
         return
 
-    # NUEVA CATEGORÍA
+    # ========= NUEVA CATEGORÍA =========
     if estado == "nueva_categoria":
         sheet_categorias.append_row([texto])
         context.user_data.clear()
@@ -185,7 +200,7 @@ async def manejar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # NUEVO PAGO
+    # ========= NUEVO PAGO =========
     if estado == "nuevo_pago":
         sheet_pagos.append_row([texto])
         context.user_data.clear()
@@ -203,8 +218,13 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar))
 
-# recordatorio diario
-app.job_queue.run_daily(recordatorio, time(hour=22, minute=0))
+# ========= ZONA HORARIA PERÚ =========
+zona = pytz.timezone("America/Lima")
+
+app.job_queue.run_daily(
+    recordatorio,
+    time(hour=22, minute=0, tzinfo=zona)
+)
 
 print("Bot corriendo...")
 app.run_polling()
